@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYSTEM STATUS</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'mono': ['"Share Tech Mono"', 'monospace'],
+                    },
+                    colors: {
+                        'tech-black': '#050505',
+                        'tech-grid': '#1a1a1a',
+                        'tech-accent': '#00ff41',
+                        'tech-accent-dim': 'rgba(0, 255, 65, 0.2)',
+                        'tech-alert': '#ff3333',
+                        'tech-warn': '#ffbf00',
+                    },
+                    spacing: {
+                        'px': '1px',
+                    },
+                    animation: {
+                        'spin-slow': 'spin 12s linear infinite',
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #050505;
+            color: #e5e5e5;
+            background-image: 
+                linear-gradient(rgba(26, 26, 26, 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(26, 26, 26, 0.5) 1px, transparent 1px);
+            background-size: 20px 20px;
+            text-shadow: 0 0 2px rgba(0, 255, 65, 0.3);
+        }
+
+       
+        * {
+            border-radius: 0 !important; 
+            box-sizing: border-box;
+        }
+
+        .outline-box {
+            outline: 1px solid #333;
+            background: rgba(10, 10, 10, 0.95);
+            position: relative;
+            box-shadow: 0 0 5px rgba(0,0,0,0.8);
+            transition: all 0.2s ease;
+        }
+
+        .outline-box:hover {
+            border-color: #00ff41;
+            box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
+            z-index: 5;
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 255, 65, 0.04) 50%, rgba(0,0,0,0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            pointer-events: none;
+            animation: scanline 8s linear infinite;
+        }
+        
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(18, 16, 16, 0.02);
+            z-index: 9999;
+            opacity: 0.3;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.27; }
+            50% { opacity: 0.3; }
+            100% { opacity: 0.28; }
+        }
+
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+       
+        @keyframes spin-reverse {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(-360deg); }
+        }
+        .animate-spin-reverse {
+            animation: spin-reverse 15s linear infinite;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; border-left: 1px solid #333; }
+        ::-webkit-scrollbar-thumb { background: #00ff41; }
+
+        .glitch-hover:hover {
+            animation: glitch-anim 0.3s infinite;
+            color: #ff3333;
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0) }
+            20% { transform: translate(-2px, 2px) }
+            40% { transform: translate(-2px, -2px) }
+            60% { transform: translate(2px, 2px) }
+            80% { transform: translate(2px, -2px) }
+            100% { transform: translate(0) }
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #diagnostic-modal {
+            backdrop-filter: blur(2px);
+        }
+    </style>
+</head>
+<body class="font-mono text-xs md:text-sm h-screen w-screen overflow-hidden flex flex-col p-2 gap-2 select-none">
+
+   
+    <div class="scanline"></div>
+    <div class="crt-flicker"></div>
+
+   
+    <header class="flex justify-between items-center outline-box p-2 h-12 shrink-0 z-20">
+        <div class="flex gap-4 items-center">
+            <span class="bg-tech-accent text-tech-black px-2 font-bold text-sm tracking-wider glitch-hover cursor-default">SYS_ROOT</span>
+            <span class="text-gray-500">//</span>
+            <span id="header-unit" class="font-bold text-white">UNIT_04</span>
+            <span class="text-gray-600 border-l border-gray-700 pl-4 hidden md:inline">LAT: 34.0522 N</span>
+            <span class="text-gray-600 hidden md:inline">LON: 118.2437 W</span>
+        </div>
+        
+        <div class="flex gap-6 items-center">
+            <div class="text-right hidden sm:block">
+                <div class="text-[10px] text-gray-500">LOCAL TIME</div>
+                <div id="clock" class="text-tech-accent font-bold text-base">00:00:00</div>
+            </div>
+            <div class="flex items-center gap-2 border-l border-gray-700 pl-4">
+                <span class="text-tech-accent blink text-[10px]">●</span>
+                <span class="text-gray-300">ONLINE</span>
+                <span class="text-gray-600 ml-2 text-[10px]">UPTIME: <span id="uptime-counter">000:00:00</span></span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 grid grid-cols-12 gap-2 overflow-hidden z-10">
+        
+        
+        <aside class="col-span-12 md:col-span-2 outline-box flex flex-col justify-between p-2 bg-tech-black">
+            <nav class="flex flex-col gap-1" id="main-nav">
+                <button onclick="switchTab('DASHBOARD')" class="nav-btn active p-2 bg-tech-accent text-tech-black font-bold border-l-4 border-tech-accent cursor-pointer text-left transition-all hover:bg-white">
+                    > DASHBOARD
+                </button>
+                <button onclick="switchTab('TELEMETRY')" class="nav-btn p-2 border-l-4 border-transparent text-gray-500 hover:bg-tech-grid hover:text-white cursor-pointer text-left transition-all">
+                    > TELEMETRY
+                </button>
+                <button onclick="switchTab('LOGS')" class="nav-btn p-2 border-l-4 border-transparent text-gray-500 hover:bg-tech-grid hover:text-white cursor-pointer text-left transition-all">
+                    > SYSTEM LOGS
+                </button>
+                <button onclick="toggleDiagnostics()" class="nav-btn p-2 border-l-4 border-transparent text-tech-warn hover:bg-tech-warn/20 hover:text-tech-warn cursor-pointer text-left transition-all">
+                    > DIAGNOSTICS
+                </button>
+                <button onclick="switchTab('SETTINGS')" class="nav-btn p-2 border-l-4 border-transparent text-gray-500 hover:bg-tech-grid hover:text-white cursor-pointer text-left transition-all">
+                    > CONFIG
+                </button>
+            </nav>
+            
+            <div class="border-t border-tech-grid pt-2 mt-2">
+                <div class="flex justify-between text-[10px] text-gray-500 mb-1">
+                    <span>MEMORY ALLOC</span>
+                    <span id="mem-text">45%</span>
+                </div>
+                <div class="w-full h-1 bg-tech-grid mb-1">
+                    <div id="mem-bar" class="h-full bg-tech-accent w-[45%] transition-all duration-1000"></div>
+                </div>
+                <div class="flex justify-between mt-1 text-[10px] text-gray-600">
+                    <span>CORE_TEMP: 42°C</span>
+                    <span>16GB ECC</span>
+                </div>
+            </div>
+        </aside>
+
+       
+        <section class="col-span-12 md:col-span-7 flex flex-col gap-2">
+            
+           
+            <div class="flex-1 outline-box relative p-4 flex items-center justify-center overflow-hidden group">
+               
+                <div class="absolute inset-0" style="background-image: radial-gradient(#333 1px, transparent 1px); background-size: 40px 40px; opacity: 0.5;"></div>
+                
+                
+                <div class="absolute w-64 h-64 border border-tech-accent/40 animate-[spin_12s_linear_infinite] flex items-center justify-center z-10">
+                    
+                    <div class="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white"></div>
+                    <div class="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-white"></div>
+                    <div class="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-white"></div>
+                    <div class="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white"></div>
+                </div>
+
+             
+                <div class="absolute w-48 h-48 border-2 border-dashed border-tech-accent animate-spin-reverse flex items-center justify-center z-10">
+                    
+                    <div class="absolute top-0 w-2 h-2 bg-tech-accent"></div>
+                    <div class="absolute bottom-0 w-2 h-2 bg-tech-accent"></div>
+                    <div class="absolute left-0 w-2 h-2 bg-tech-accent"></div>
+                    <div class="absolute right-0 w-2 h-2 bg-tech-accent"></div>
+                </div>
+
+                <div class="relative w-32 h-32 border border-white/50 flex items-center justify-center bg-black/50 backdrop-blur-sm z-30">
+                    <div class="absolute w-full h-[1px] bg-tech-alert"></div>
+                    <div class="absolute h-full w-[1px] bg-tech-alert"></div>
+                    <div class="w-4 h-4 bg-tech-alert blink z-10 shadow-[0_0_10px_#ff3333]"></div>
+                   
+                    <div class="absolute inset-4 border border-tech-alert/30"></div>
+                </div>
+
+                <div id="radar-targets" class="absolute inset-0 w-full h-full z-20 pointer-events-none">
+                </div>
+                
+              
+                <div class="absolute top-2 left-2 text-[10px] text-gray-500 z-40">CAM_01 [LIVE]</div>
+                <div class="absolute bottom-2 right-2 text-[10px] text-tech-accent z-40 tracking-widest">SQUARE_SCAN</div>
+            </div>
+
+           
+            <div class="h-48 outline-box p-2 font-mono text-xs overflow-hidden flex flex-col bg-tech-black/80">
+                <div class="border-b border-gray-800 pb-1 mb-1 flex justify-between text-[10px] text-gray-500">
+                    <span>> TERMINAL_OUTPUT</span>
+                    <span>TCP/IP: SECURE</span>
+                </div>
+                <div class="flex-1 overflow-y-auto" id="console-log">
+                </div>
+                <div class="pt-1 flex items-center text-gray-400 text-[10px] border-t border-gray-800/50 mt-1">
+                    <span class="text-tech-accent mr-2">admin@orbital:~$</span>
+                    <span id="typing-line" class="animate-pulse">_</span>
+                </div>
+            </div>
+        </section>
+
+        <aside class="col-span-12 md:col-span-3 flex flex-col gap-2">
+                      
+            <div class="outline-box p-2 grid grid-cols-2 gap-px bg-tech-grid h-32">
+                <div class="bg-tech-black p-1 flex flex-col justify-between aspect-square relative overflow-hidden group">
+                    <span class="text-gray-500 text-[9px] z-10">CPU TEMP</span>
+                    <span class="text-2xl font-bold text-white z-10" id="stat-cpu">42°C</span>
+                    <div class="absolute bottom-0 left-0 h-1 bg-tech-alert transition-all duration-300" id="cpu-bar" style="width: 42%"></div>
+                </div>
+                <div class="bg-tech-black p-1 flex flex-col justify-between aspect-square relative overflow-hidden group">
+                    <span class="text-gray-500 text-[9px] z-10">FAN SPD</span>
+                    <span class="text-2xl font-bold text-white z-10" id="stat-fan">1200</span>
+                    <span class="text-[9px] text-gray-600">RPM</span>
+                </div>
+                <div class="bg-tech-black p-1 flex flex-col justify-between aspect-square relative overflow-hidden group">
+                    <span class="text-gray-500 text-[9px] z-10">NET IN</span>
+                    <span class="text-lg font-bold text-tech-accent z-10" id="stat-net-in">4.2 <span class="text-[9px]">MB</span></span>
+                </div>
+                <div class="bg-tech-black p-1 flex flex-col justify-between aspect-square relative overflow-hidden group">
+                    <span class="text-gray-500 text-[9px] z-10">NET OUT</span>
+                    <span class="text-lg font-bold text-white z-10" id="stat-net-out">1.1 <span class="text-[9px]">MB</span></span>
+                </div>
+            </div>
+
+            <div class="flex-1 outline-box p-2 bg-tech-black relative flex flex-col">
+                <div class="bg-tech-grid/20 p-1 mb-1 text-center text-[10px] tracking-widest text-gray-400 flex justify-between">
+                    <span>TRAFFIC_HISTORY</span>
+                    <span class="text-tech-accent animate-pulse">● REC</span>
+                </div>
+                <div class="flex-1 w-full relative">
+                    <canvas id="trafficChart"></canvas>
+                    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(0deg, transparent 24%, #222 25%, #222 26%, transparent 27%, transparent 74%, #222 75%, #222 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, #222 25%, #222 26%, transparent 27%, transparent 74%, #222 75%, #222 76%, transparent 77%, transparent); background-size: 30px 30px;"></div>
+                </div>
+            </div>
+            
+            <div class="outline-box p-0 border-tech-alert/30 bg-tech-alert/5 hidden" id="alert-box">
+                <div class="p-2 bg-tech-alert/20 border-b border-tech-alert/30 text-tech-alert font-bold text-[10px] flex justify-between">
+                    <span>CRITICAL WARNING</span>
+                    <span class="blink">!</span>
+                </div>
+                <div class="p-2 flex items-start gap-2">
+                    <div class="text-xl text-tech-alert">▲</div>
+                    <div>
+                        <h4 class="font-bold text-tech-alert text-xs mb-1">SECURITY ALERT</h4>
+                        <p class="text-[10px] leading-tight text-gray-300">Unauthorized handshake detected on Port 22. Trace route initiated.</p>
+                    </div>
+                </div>
+                <button onclick="dismissAlert()" class="w-full bg-tech-alert text-black font-bold py-1 text-xs hover:bg-white transition-colors">ACKNOWLEDGE</button>
+            </div>
+            
+            <div class="h-auto outline-box p-2">
+                <div class="text-[10px] text-gray-500 mb-2 border-b border-gray-800 pb-1">MODULE_STATUS</div>
+                <ul class="space-y-1 text-[10px]">
+                    <li class="flex justify-between items-center p-1">
+                        <span class="text-gray-400">DATABASE_PROXY</span>
+                        <span class="text-tech-accent">[ACTIVE]</span>
+                    </li>
+                    <li class="flex justify-between items-center p-1">
+                        <span class="text-gray-400">FIREWALL_LAYER</span>
+                        <span class="text-tech-accent">[SECURE]</span>
+                    </li>
+                    <li class="flex justify-between items-center p-1">
+                        <span class="text-gray-400">ENCRYPTION</span>
+                        <span class="text-tech-accent">AES-256</span>
+                    </li>
+                    <li class="flex justify-between items-center p-1">
+                        <span class="text-gray-400">SATELLITE_UPLINK</span>
+                        <span class="text-tech-warn blink">[SYNCING...]</span>
+                    </li>
+                </ul>
+            </div>
+
+        </aside>
+    </main>
+
+    <footer class="outline-box h-8 shrink-0 flex items-center justify-between px-2 text-[10px] text-gray-600 bg-tech-black">
+        <div class="flex items-center gap-4">
+            <span>BUILD: v.2.4.91 // STABLE</span>
+            <span class="hidden sm:inline text-tech-accent">● ALL SYSTEMS NOMINAL</span>
+        </div>
+        <div class="flex gap-4">
+            <span>KEY: 0x9281_AF... <button class="hover:text-white ml-1">[COPY]</button></span>
+            <span>USER: ADMIN</span>
+        </div>
+    </footer>
+
+    <div id="diagnostic-modal" class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center p-4">
+        <div class="w-full max-w-md outline-box bg-tech-black p-0">
+            <div class="bg-tech-grid p-2 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-tech-accent font-bold">> SYSTEM_DIAGNOSTICS.EXE</h3>
+                <button onclick="toggleDiagnostics()" class="text-tech-alert hover:text-white">[X]</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div class="text-center">
+                    <div class="inline-block w-16 h-16 border-4 border-t-tech-accent border-r-gray-700 border-b-gray-700 border-l-gray-700 animate-spin rounded-full mb-2"></div>
+                    <div class="text-sm font-bold text-white animate-pulse">SCANNING SYSTEM INTEGRITY...</div>
+                </div>
+                
+                <div class="space-y-2">
+                    <div class="text-[10px] text-gray-500 flex justify-between">
+                        <span>CHECKING MEMORY_SECTORS</span>
+                        <span>100%</span>
+                    </div>
+                    <div class="w-full h-1 bg-tech-grid"><div class="h-full bg-tech-accent w-full"></div></div>
+
+                    <div class="text-[10px] text-gray-500 flex justify-between">
+                        <span>VERifying INODE_TABLE</span>
+                        <span id="diag-progress-text">45%</span>
+                    </div>
+                    <div class="w-full h-1 bg-tech-grid"><div id="diag-bar" class="h-full bg-tech-warn w-[45%] transition-all duration-200"></div></div>
+                </div>
+
+                <div class="bg-tech-grid/20 p-2 text-[10px] text-gray-400 font-mono h-20 overflow-hidden" id="diag-console">
+                    > Initiating diagnostic sequence...<br>
+                    > Mounting virtual file system...<br>
+                    > Checking bad blocks...
+                </div>
+            </div>
+            <div class="p-2 border-t border-gray-700 text-right">
+                <button onclick="toggleDiagnostics()" class="px-4 py-1 bg-gray-800 text-white text-xs hover:bg-tech-accent hover:text-black transition-colors">ABORT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('console-log');
+        const radarContainer = document.getElementById('radar-targets');
+        const typingLine = document.getElementById('typing-line');
+        
+       
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('en-GB');
+            
+       
+            let uptime = document.getElementById('uptime-counter').innerText.split(':');
+            let sec = parseInt(uptime[2]) + 1;
+            if(sec >= 60) { sec = 0; uptime[1]++; }
+            document.getElementById('uptime-counter').innerText = 
+                `${uptime[0]}:${String(uptime[1]).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        
+        const logTypes = {
+            INFO: { color: 'text-gray-400', prefix: '[INFO]' },
+            WARN: { color: 'text-tech-warn', prefix: '[WARN]' },
+            ERROR: { color: 'text-tech-alert', prefix: '[ERR]' },
+            SUCCESS: { color: 'text-tech-accent', prefix: '[OK]' },
+            NET: { color: 'text-blue-400', prefix: '[NET]' }
+        };
+
+        const logMessages = [
+            { type: 'INFO', text: "Scanning sector 7G... No anomalies." },
+            { type: 'NET', text: "Packet received from 192.168.0.X" },
+            { type: 'WARN', text: "Latency spike detected (120ms)" },
+            { type: 'SUCCESS', text: "Cache optimization complete." },
+            { type: 'INFO', text: "User 'GUEST' session timeout." },
+            { type: 'INFO', text: "Rendering frame buffer..." },
+            { type: 'ERROR', text: "Connection unstable: Retrying..." },
+            { type: 'INFO', text: "Key rotation scheduled." }
+        ];
+
+        function addLog(msgObj) {
+            const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+            const div = document.createElement('div');
+            const style = logTypes[msgObj.type] || logTypes.INFO;
+            
+            div.className = `font-mono text-xs border-l-2 border-transparent hover:border-gray-500 pl-1 transition-colors ${style.color}`;
+            div.innerHTML = `<span class="opacity-50 text-[10px]">[${time}]</span> <span class="font-bold">${style.prefix}</span> ${msgObj.text}`;
+            
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            if (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+
+        setInterval(() => {
+            const randomMsg = logMessages[Math.floor(Math.random() * logMessages.length)];
+            addLog(randomMsg);
+            
+            if(Math.random() > 0.7) {
+                typingLine.innerText = "PROCESSING_DATA_";
+                setTimeout(() => typingLine.innerText = "_", 300);
+            }
+        }, 2000);
+
+        function createTarget() {
+            if (document.hidden) return; 
+
+            const size = Math.floor(Math.random() * 10) + 4;
+            const div = document.createElement('div');
+            
+            const top = 50 + (Math.random() * 80 - 40); 
+            const left = 50 + (Math.random() * 80 - 40);
+            
+            div.className = 'absolute bg-tech-alert/80 shadow-[0_0_5px_#ff3333] transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-1000';
+            div.style.width = `${size}px`;
+            div.style.height = `${size}px`;
+            div.style.top = `${top}%`;
+            div.style.left = `${left}%`;
+            
+            radarContainer.appendChild(div);
+
+            setTimeout(() => {
+                div.style.opacity = '0';
+                setTimeout(() => div.remove(), 1000);
+            }, 2000 + Math.random() * 3000);
+        }
+
+        setInterval(createTarget, 800);
+
+        function fluctuate(id, base, variance, unit = '') {
+            const el = document.getElementById(id);
+            const current = parseFloat(el.innerText);
+            const change = (Math.random() * variance * 2) - variance;
+            let newVal = (base + change).toFixed(1);
+            
+            if (unit === '') newVal = parseInt(newVal);
+            
+            el.innerHTML = `${newVal} <span class="${unit ? '' : 'hidden'}">${unit}</span>`;
+            return newVal;
+        }
+
+        setInterval(() => {
+            const cpu = fluctuate('stat-cpu', 42, 2);
+            document.getElementById('cpu-bar').style.width = `${cpu}%`;
+            
+            fluctuate('stat-fan', 1200, 50);
+            fluctuate('stat-net-in', 4.2, 1.5, 'MB');
+            fluctuate('stat-net-out', 1.1, 0.5, 'MB');
+
+            const mem = 40 + Math.floor(Math.random() * 10);
+            document.getElementById('mem-text').innerText = `${mem}%`;
+            document.getElementById('mem-bar').style.width = `${mem}%`;
+        }, 2000);
+
+       
+        const canvas = document.getElementById('trafficChart');
+        const ctx = canvas.getContext('2d');
+        let chartData = new Array(50).fill(10); 
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = canvas.parentElement.offsetHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawChart() {
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            ctx.clearRect(0, 0, w, h);
+           
+            const prev = chartData[chartData.length - 1];
+            let next = prev + (Math.random() * 20 - 10);
+            if (next < 5) next = 5;
+            if (next > h - 5) next = h - 5;
+            
+            chartData.shift();
+            chartData.push(next);
+
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#00ff41';
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'miter'; 
+            
+            const step = w / (chartData.length - 1);
+            
+            for (let i = 0; i < chartData.length; i++) {
+                const y = h - chartData[i];
+                if (i === 0) ctx.moveTo(0, y);
+                else ctx.lineTo(i * step, y);
+            }
+            ctx.stroke();
+
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.1)';
+            ctx.fill();
+
+            requestAnimationFrame(drawChart);
+        }
+        
+        setInterval(() => {
+        }, 100);
+        requestAnimationFrame(drawChart);
+
+
+        function switchTab(tabName) {
+            const buttons = document.querySelectorAll('.nav-btn');
+            buttons.forEach(btn => {
+                if(btn.innerText.includes(tabName)) {
+                    btn.classList.add('border-l-tech-accent', 'bg-tech-accent', 'text-tech-black', 'font-bold');
+                    btn.classList.remove('border-transparent', 'text-gray-500');
+                } else {
+                    btn.classList.remove('border-l-tech-accent', 'bg-tech-accent', 'text-tech-black', 'font-bold');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                }
+            });
+            
+            const consoleDiv = document.getElementById('console-log');
+            addLog({ type: 'INFO', text: `Switching view to ${tabName}...` });
+            
+            document.querySelector('section').style.opacity = '0.5';
+            setTimeout(() => document.querySelector('section').style.opacity = '1', 100);
+        }
+
+       
+        let diagInterval;
+        function toggleDiagnostics() {
+            const modal = document.getElementById('diagnostic-modal');
+            const isHidden = modal.classList.contains('hidden');
+            
+            if (isHidden) {
+                modal.classList.remove('hidden');
+                let width = 0;
+                const bar = document.getElementById('diag-bar');
+                const diagConsole = document.getElementById('diag-console');
+                const progressText = document.getElementById('diag-progress-text');
+                
+                clearInterval(diagInterval);
+                diagInterval = setInterval(() => {
+                    if (width >= 100) {
+                        width = 0;
+                        diagConsole.innerHTML += `> Cycle complete. Result: PASSED<br>`;
+                        diagConsole.scrollTop = diagConsole.scrollHeight;
+                    } else {
+                        width++;
+                        bar.style.width = width + '%';
+                        progressText.innerText = width + '%';
+                    }
+                }, 50);
+                
+            } else {
+                modal.classList.add('hidden');
+                clearInterval(diagInterval);
+            }
+        }
+
+        function triggerAlert() {
+            const alertBox = document.getElementById('alert-box');
+            alertBox.classList.remove('hidden');
+            addLog({ type: 'ERROR', text: 'Security Alert Triggered!' });
+        }
+
+        function dismissAlert() {
+            document.getElementById('alert-box').classList.add('hidden');
+            addLog({ type: 'SUCCESS', text: 'Alert acknowledged by user.' });
+        }
+
+        setTimeout(() => {
+            triggerAlert();
+            setInterval(triggerAlert, 20000 + Math.random() * 10000);
+        }, 5000);
+
+    </script>
+</body>
+</html>
